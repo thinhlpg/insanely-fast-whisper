@@ -41,16 +41,12 @@ def preprocess_inputs(inputs):
         in_sampling_rate = inputs.pop("sampling_rate")
         inputs = _inputs
         if in_sampling_rate != 16000:
-            inputs = F.resample(
-                torch.from_numpy(inputs), in_sampling_rate, 16000
-            ).numpy()
+            inputs = F.resample(torch.from_numpy(inputs), in_sampling_rate, 16000).numpy()
 
     if not isinstance(inputs, np.ndarray):
         raise ValueError(f"We expect a numpy ndarray as input, got `{type(inputs)}`")
     if len(inputs.shape) != 1:
-        raise ValueError(
-            "We expect a single channel audio input for ASRDiarizePipeline"
-        )
+        raise ValueError("We expect a single channel audio input for ASRDiarizePipeline")
 
     # diarization model expects float32 torch tensor of shape `(channels, seq_len)`
     diarizer_inputs = torch.from_numpy(inputs).float()
@@ -113,11 +109,15 @@ def diarize_audio(diarizer_inputs, diarization_pipeline):
 def post_process_segments_and_transcripts(new_segments, transcript, group_by_speaker) -> list:
     # get the end timestamps for each chunk from the ASR output
     end_timestamps = np.array(
-        [chunk["timestamp"][-1] if chunk["timestamp"][-1] is not None else sys.float_info.max for chunk in transcript])
+        [chunk["timestamp"][-1] if chunk["timestamp"][-1] is not None else sys.float_info.max for chunk in transcript]
+    )
     segmented_preds = []
 
     # align the diarizer timestamps and the ASR timestamps
     for segment in new_segments:
+        # print(len(new_segments)) 130 
+        # print(len(transcript)) 5xx
+
         # get the diarizer end timestamp
         end_time = segment["segment"]["end"]
         # find the ASR end timestamp that is closest to the diarizer's end timestamp and cut the transcript to here
@@ -127,9 +127,7 @@ def post_process_segments_and_transcripts(new_segments, transcript, group_by_spe
             segmented_preds.append(
                 {
                     "speaker": segment["speaker"],
-                    "text": "".join(
-                        [chunk["text"] for chunk in transcript[: upto_idx + 1]]
-                    ),
+                    "text": "".join([chunk["text"] for chunk in transcript[: upto_idx + 1]]),
                     "timestamp": (
                         transcript[0]["timestamp"][0],
                         transcript[upto_idx]["timestamp"][1],
@@ -141,10 +139,10 @@ def post_process_segments_and_transcripts(new_segments, transcript, group_by_spe
                 segmented_preds.append({"speaker": segment["speaker"], **transcript[i]})
 
         # crop the transcripts and timestamp lists according to the latest timestamp (for faster argmin)
-        transcript = transcript[upto_idx + 1:]
-        end_timestamps = end_timestamps[upto_idx + 1:]
+        transcript = transcript[upto_idx + 1 :]
+        end_timestamps = end_timestamps[upto_idx + 1 :]
 
         if len(end_timestamps) == 0:
-            break 
+            break
 
     return segmented_preds

@@ -87,9 +87,38 @@ parser.add_argument(
     help="Name of the pretrained model/ checkpoint to perform diarization. (default: pyannote/speaker-diarization)",
 )
 
+parser.add_argument(
+    "--chunk_size",
+    required=False,
+    default=30,
+    type=int,
+    help="Chunk size for Whisper ASR. (default: 30)",
+)
+
+parser.add_argument(
+    "--stride",
+    required=False,
+    default=None,
+    type=int,
+    help="Stride for Whisper ASR. (default: chunk_size/6)",
+)
+
+parser.add_argument(
+    "--verbose",
+    required=False,
+    action="store_true",
+    help="Prints out the arguments passed to the script. (default: False)",
+)
+
 
 def main():
     args = parser.parse_args()
+
+    # print args
+    if args.verbose:
+        print("===========🤗 Arguments:============")
+        for arg in vars(args):
+            print(f"{arg}: {getattr(args, arg)}")
 
     pipe = pipeline(
         "automatic-speech-recognition",
@@ -102,13 +131,16 @@ def main():
     if args.device_id == "mps":
         torch.mps.empty_cache()
     # elif not args.flash:
-        # pipe.model = pipe.model.to_bettertransformer()
+    # pipe.model = pipe.model.to_bettertransformer()
 
     ts = "word" if args.timestamp == "word" else True
 
     language = None if args.language == "None" else args.language
 
     generate_kwargs = {"task": args.task, "language": language}
+
+    if ts == "word":
+        generate_kwargs["return_segments"] = True
 
     if args.model_name.split(".")[-1] == "en":
         generate_kwargs.pop("task")
@@ -122,10 +154,11 @@ def main():
 
         outputs = pipe(
             args.file_name,
-            chunk_length_s=30,
+            chunk_length_s=args.chunk_size,
             batch_size=args.batch_size,
             generate_kwargs=generate_kwargs,
             return_timestamps=ts,
+            stride_length_s=[args.stride, args.stride] if args.stride else None,
         )
 
     if args.hf_token != "no_token":
@@ -142,6 +175,4 @@ def main():
             result = build_result([], outputs)
             json.dump(result, fp, ensure_ascii=False)
 
-        print(
-            f"Voila!✨ Your file has been transcribed go check it out over here 👉 {args.transcript_path}"
-        )
+        print(f"Voila!✨ Your file has been transcribed go check it out over here 👉 {args.transcript_path}")
